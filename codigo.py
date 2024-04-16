@@ -1,86 +1,73 @@
-import sqlite3
+import firebase_admin
+from firebase_admin import credentials, db
 
-def conexion(archivo):
-    conn = None
-    try:
-        conn = sqlite3.connect(archivo)
-        return conn
-    except sqlite3.Error as e:
-        print(e)
+# Inicializar la app de Firebase
+cred = credentials.Certificate("path/to/serviceAccountKey.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://tareas-de-casa-47d70-default-rtdb.firebaseio.com'
+})
 
-def tabla(conn):
-    sql = ''' CREATE TABLE IF NOT EXISTS datos (
-                id INTEGER PRIMARY KEY,
-                descripcion TEXT
-            ); '''
-    cur = conn.cursor()
-    cur.execute(sql)
+# Referencia a la base de datos en Firebase
+ref = db.reference('/archivos')
 
-def tarea(conn, tarea):
-    sql = ''' INSERT INTO datos(descripcion)
-              VALUES(?) '''
-    cur = conn.cursor()
-    cur.execute(sql, tarea)
-    conn.commit()
-    return cur.lastrowid
+def tarea(tarea):
+    # Agregar tarea a la base de datos de Firebase
+    new_task_ref = ref.push()
+    new_task_ref.set({
+        'descripcion': tarea
+    })
+    return new_task_ref.key
 
-def vertarea(conn):
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM datos")
-    fila = cur.fetchall()
-    for fila in fila:
-        print(fila)
+def vertarea():
+    # Obtener todas las tareas de la base de datos de Firebase
+    tasks = ref.get()
+    if tasks:
+        for task_key, task_value in tasks.items():
+            print(f"ID: {task_key}, Descripción: {task_value['descripcion']}")
+    else:
+        print("No hay tareas.")
 
-def editartarea(conn, identificador, nuevadescri):
-    sql = ''' UPDATE datos
-              SET descripcion = ?
-              WHERE id = ? '''
-    cur = conn.cursor()
-    cur.execute(sql, (nuevadescri, identificador))
-    conn.commit()
+def editartarea(identificador, nuevadescri):
+    # Actualizar la descripción de una tarea en la base de datos de Firebase
+    ref.child(identificador).update({
+        'descripcion': nuevadescri
+    })
 
-def borrartarea(conn, identificador):
-    sql = ''' DELETE FROM datos WHERE id = ? '''
-    cur = conn.cursor()
-    cur.execute(sql, (identificador,))
-    conn.commit()
+def borrartarea(identificador):
+    # Eliminar una tarea de la base de datos de Firebase
+    ref.child(identificador).delete()
 
 def main():
-    archivo = "tareas.db"
-    conn = conexion(archivo)
-    with conn:
-        tabla(conn)
-        while True:
-            print("\nOpciones:")
-            print("1. Ver tareas")
-            print("2. Agregar tarea")
-            print("3. Editar tarea")
-            print("4. Eliminar tarea")
-            print("5. Salir")
-            pciones = input("Seleccione una opción: ")
+    while True:
+        print("\nOpciones:")
+        print("1. Ver tareas")
+        print("2. Agregar tarea")
+        print("3. Editar tarea")
+        print("4. Eliminar tarea")
+        print("5. Salir")
+        opciones = input("\nSeleccione una opción: ")
 
-            if pciones == "1":
-                print("\nTareas:")
-                vertarea(conn)
-            elif pciones == "2":
-                descripcion = input("\nIngrese la tarea: ")
-                tarea_ingresada = (descripcion,)
-                tarea(conn, tarea_ingresada)
-                print("Tarea agregada exitosamente.")
-            elif pciones == "3":
-                identificador = input("\nIngrese el ID de la tarea que desea editar: ")
-                nuevadescri = input("Ingrese la nueva descripción para la tarea: ")
-                editartarea(conn, identificador, nuevadescri)
-                print("Tarea editada exitosamente.")
-            elif pciones == "4":
-                identificador = input("\nIngrese el ID de la tarea que desea eliminar: ")
-                borrartarea(conn, identificador)
-                print("Tarea eliminada exitosamente.")
-            elif pciones == "5":
-                print("Saliendo...")
-                break
-            else:
-                print("Opción no válida. Intente de nuevo.")
+        if opciones == "1":
+            print("\nTareas:")
+            vertarea()
+            input("\nPulsa enter para volver al menú de opciones.")
+        elif opciones == "2":
+            descripcion = input("\nIngrese la tarea: ")
+            tarea_agregada = tarea(descripcion)
+            print(f"Tarea agregada exitosamente. ID: {tarea_agregada}")
+        elif opciones == "3":
+            identificador = input("\nIngrese el ID de la tarea que desea editar: ")
+            nuevadescri = input("Ingrese la nueva descripción para la tarea: ")
+            editartarea(identificador, nuevadescri)
+            print("Tarea editada exitosamente.")
+        elif opciones == "4":
+            identificador = input("\nIngrese el ID de la tarea que desea eliminar: ")
+            borrartarea(identificador)
+            print("Tarea eliminada exitosamente.")
+        elif opciones == "5":
+            print("Saliendo...")
+            break
+        else:
+            print("Opción no válida, intente de nuevo.")
 
-if __name__ == '__main__':
-    main()
+main()
